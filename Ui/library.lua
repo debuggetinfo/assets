@@ -2677,7 +2677,7 @@ do
 
     local WatermarkOuter = Library:Create('Frame', {
         BorderColor3 = Color3.new(0, 0, 0);
-        Position = UDim2.new(0, 100, 0, -25);
+        Position = UDim2.new(0, 120, 0, 10);
         Size = UDim2.new(0, 213, 0, 20);
         ZIndex = 200;
         Visible = false;
@@ -2728,6 +2728,7 @@ do
         Position = UDim2.new(0, 5, 0, 0);
         Size = UDim2.new(1, -4, 1, 0);
         TextSize = 14;
+        RichText = true;
         TextXAlignment = Enum.TextXAlignment.Left;
         ZIndex = 203;
         Parent = InnerFrame;
@@ -2752,6 +2753,7 @@ do
     local KeybindInner = Library:Create('Frame', {
         BackgroundColor3 = Library.MainColor;
         BorderColor3 = Library.OutlineColor;
+        Transparency = 0.1
         BorderMode = Enum.BorderMode.Inset;
         Size = UDim2.new(1, 0, 1, 0);
         ZIndex = 101;
@@ -2779,7 +2781,6 @@ do
         Size = UDim2.new(1, 0, 0, 20);
         Position = UDim2.fromOffset(5, 2),
         TextXAlignment = Enum.TextXAlignment.Left,
-
         Text = 'Keybinds';
         ZIndex = 104;
         Parent = KeybindInner;
@@ -2949,7 +2950,15 @@ function Library:CreateWindow(...)
         ZIndex = 1;
         Parent = ScreenGui;
     });
-
+    local Gif_Holder = Library:Create('ImageLabel', {
+        AnchorPoint = Vector2.new(0.5, 1);
+        Position = UDim2.new(0.5, 0, 0, -8); 
+        Size = UDim2.new(0, 64, 0, 64); 
+        BackgroundTransparency = 1;
+        ScaleType = Enum.ScaleType.Fit;
+        ZIndex = 5;
+        Parent = Outer;
+    });
     Library:MakeDraggable(Outer, 25);
 
     local Inner = Library:Create('Frame', {
