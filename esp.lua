@@ -36,9 +36,9 @@ getgenv().Syrniki = {
     ['Threads'] = {},
     ['Connections'] = {},
     ['Table'] = {
-        ['Enabled'] = false,
+        ['Enabled'] = true,
         ['Boxes'] = {
-            ['Enabled'] = false,
+            ['Enabled'] = true,
             ['Bounding Box'] = {
                 ['Enabled'] = false,
                 ['IncludeAccessories'] = false,
@@ -743,11 +743,15 @@ function Syrniki:CalculateBox(Data)
         return nil, nil, nil, nil, false
     end
 
+    local DefaultFOV = 55
+    local CurrentFOV = Camera.FieldOfView
+    local fovFactor = DefaultFOV / CurrentFOV
+
     local BoundingBox = Table['Boxes']['Bounding Box']
     if BoundingBox['Enabled'] then
         local Children = Data['Children']
         if not Children then
-            local Scale = (RootPart.Size.Y * ViewPortY) / (RootScreen.Z * 2)
+            local Scale = (RootPart.Size.Y * ViewPortY) / (RootScreen.Z * 2) * fovFactor
             local W, H = 3 * Scale, 4.5 * Scale
             return W, H, RootScreen.X - (W * 0.5), RootScreen.Y - (H * 0.5), OnScreen
         end
@@ -757,7 +761,7 @@ function Syrniki:CalculateBox(Data)
         local ScrMaxX, ScrMaxY = -Huge, -Huge
         local HasValidParts = false
 
-        for _, Part in Children do
+        for _, Part in pairs(Children) do
             if Part:IsA('BasePart') and Part.Transparency ~= 1 and Part ~= RootPart then
                 local Parent = Part.Parent
                 if Parent == nil then
@@ -780,8 +784,8 @@ function Syrniki:CalculateBox(Data)
                 local RX, UY, LZ = Cf.RightVector, Cf.UpVector, Cf.LookVector
                 local DepthScale = CachedFocalLength / PartScreen.Z
 
-                local Ex = (Abs(RX.X * HX) + Abs(UY.X * HY) + Abs(LZ.X * HZ)) * DepthScale
-                local Ey = (Abs(RX.Y * HX) + Abs(UY.Y * HY) + Abs(LZ.Y * HZ)) * DepthScale
+                local Ex = (Abs(RX.X * HX) + Abs(UY.X * HY) + Abs(LZ.X * HZ)) * DepthScale * fovFactor
+                local Ey = (Abs(RX.Y * HX) + Abs(UY.Y * HY) + Abs(LZ.Y * HZ)) * DepthScale * fovFactor
 
                 local PMinX, PMaxX = PartScreen.X - Ex, PartScreen.X + Ex
                 local PMinY, PMaxY = PartScreen.Y - Ey, PartScreen.Y + Ey
@@ -794,7 +798,7 @@ function Syrniki:CalculateBox(Data)
         end
 
         if not HasValidParts then
-            local Scale = (RootPart.Size.Y * ViewPortY) / (RootScreen.Z * 2)
+            local Scale = (RootPart.Size.Y * ViewPortY) / (RootScreen.Z * 2) * fovFactor
             local W, H = 3 * Scale, 4.5 * Scale
             return W, H, RootScreen.X - (W * 0.5), RootScreen.Y - (H * 0.5), OnScreen
         end
@@ -806,7 +810,7 @@ function Syrniki:CalculateBox(Data)
 
         return W, H, ScrMinX - (PadX * 0.5), ScrMinY - (PadY * 0.5), true
     else
-        local Scale = (RootPart.Size.Y * ViewPortY) / (RootScreen.Z * 2)
+        local Scale = (RootPart.Size.Y * ViewPortY) / (RootScreen.Z * 2) * fovFactor
         local W, H = 3 * Scale, 4.5 * Scale
         return W, H, RootScreen.X - (W * 0.5), RootScreen.Y - (H * 0.5), OnScreen
     end
@@ -831,7 +835,7 @@ function Syrniki:AddTarget(Player)
         ['Children'] = nil,
         ['Health'] = 0,
         ['MaxHealth'] = 100,
-        ['CurrentTool'] = 'none',
+        ['CurrentTool'] = nil,
         ['Alive'] = false,
         ['LastW'] = nil,
         ['LastH'] = nil,
@@ -892,6 +896,62 @@ function Syrniki:AddTarget(Player)
         Data['BindHealth'] = HealthHandler.BindHealth
     end
 
+    local ToolHandler = {}
+    do
+        function ToolHandler.BindTool(Character)
+            if Data['Conns']['ToolAdded'] then
+                Data['Conns']['ToolAdded']:Disconnect()
+            end
+            if Data['Conns']['ToolRemoved'] then
+                Data['Conns']['ToolRemoved']:Disconnect()
+            end
+
+            local function FindWeapon()
+                if not Character or not Character.Parent then
+                    Data['CurrentTool'] = 'none'
+                    return
+                end
+                local found = false
+                for _, Child in pairs(Data['Children'] or {}) do
+                    if Child:IsA('Model') and Child:FindFirstChild('Handle') then
+                        Data['CurrentTool'] = Child.Name
+                        found = true
+                        break
+                    end
+                end
+                if not found then
+                    for _, Child in pairs(Data['Children'] or {}) do
+                        if Child:IsA('Tool') then
+                            Data['CurrentTool'] = Child.Name
+                            found = true
+                            break
+                        end
+                    end
+                end
+                if not found then
+                    Data['CurrentTool'] = 'none'
+                end
+            end
+
+            FindWeapon()
+
+            Data['Conns']['ToolAdded'] = Character.ChildAdded:Connect(function(Child)
+                if Child:IsA('BasePart') then
+                    task.wait(0.1)
+                    FindWeapon()
+                end
+            end)
+
+            Data['Conns']['ToolRemoved'] = Character.ChildRemoved:Connect(function(Child)
+                if Child:IsA('BasePart') then
+                    task.wait(0.1)
+                    FindWeapon()
+                end
+            end)
+        end
+        Data['BindTool'] = ToolHandler.BindTool
+    end
+
     local ChildHandler = {}
     do
         function ChildHandler.BindChildren(Character)
@@ -917,6 +977,8 @@ function Syrniki:AddTarget(Player)
                     end
                 end
             end)
+
+            Data['BindTool'](Character)
         end
         Data['BindChildren'] = ChildHandler.BindChildren
     end
@@ -1103,9 +1165,6 @@ function Syrniki:Update(Player, Data)
     Data['Children'] = Character:GetChildren()
     Data['Health'] = Humanoid.Health
     Data['MaxHealth'] = Humanoid.MaxHealth
-
-  local Tool = Character and Character:FindFirstChildOfClass("Tool")
-  Data["CurrentTool"] = Tool and Tool.Name or "none"
 
     if Data['Character'] ~= Character then
         Data['Character'] = Character
